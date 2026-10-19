@@ -1,20 +1,19 @@
-FROM golang:1.24-alpine  AS build
-RUN apk add --no-cache git
+# ---- Build stage ----
+FROM golang:1.27-alpine AS build
+WORKDIR /app
 
-WORKDIR /src
+# Copy dependency files first so this layer is cached
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
-# disable cgo, target linux, static link
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w" -o server .
+# Copy source and build a static binary
+COPY product-service.go ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o product-service .
 
-FROM alpine:latest
-RUN apk add --no-cache ca-certificates
-
+# ---- Runtime stage ----
+FROM alpine:3.20
 WORKDIR /app
-COPY --from=build /src/server .
+COPY --from=build /app/product-service .
 
 EXPOSE 8080
-ENTRYPOINT ["./server"]
+CMD ["./product-service"]
