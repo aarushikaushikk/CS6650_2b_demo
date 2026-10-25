@@ -1,9 +1,8 @@
+# HW6 Option B: Prometheus + Grafana run locally, but scrape the app
+# running on ECS (no local app container). Set ECS_IP before starting:
+#   export ECS_IP=$(../scripts/get-ecs-ip.sh)
+#   docker compose up -d
 services:
-  app:
-    build: ../src
-    ports:
-      - "8080:8080"
-
   prometheus:
     image: prom/prometheus:v3.4.0
     ports:
@@ -11,15 +10,13 @@ services:
     configs:
       - source: prom_config
         target: /etc/prometheus/prometheus.yml
-    depends_on:
-      - app
 
   grafana:
     image: grafana/grafana:12.0.0
     ports:
       - "3000:3000"
     volumes:
-      - grafana-data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana   # keeps your HW5 dashboard + data source
     depends_on:
       - prometheus
 
@@ -32,7 +29,7 @@ configs:
         - job_name: "product-api"
           metrics_path: /metrics
           static_configs:
-            - targets: ["app:8080"]
+            - targets: ["${ECS_IP:?Set ECS_IP to the ECS task public IP}:8080"]
 
 volumes:
   grafana-data:

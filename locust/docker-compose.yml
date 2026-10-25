@@ -1,3 +1,6 @@
+# Target host comes from TARGET_HOST, e.g.
+#   export TARGET_HOST=http://$ECS_IP:8080
+#   docker compose up --scale worker=4
 services:
   master:
     image: locustio/locust
@@ -5,7 +8,7 @@ services:
       - "8089:8089"
     volumes:
       - ./:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --master -H http://host.docker.internal:8080
+    command: -f /mnt/locust/locustfile.py --master -H ${TARGET_HOST:?Set TARGET_HOST, e.g. http://<ECS_IP>:8080}
 
   worker:
     image: locustio/locust
