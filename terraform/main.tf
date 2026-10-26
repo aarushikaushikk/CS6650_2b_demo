@@ -1,4 +1,5 @@
-# Wire together four focused modules: network, ecr, logging, ecs.
+# Wire together the modules: network, ecr, logging, alb, ecs,
+# autoscaling, monitoring.
 
 module "network" {
   source         = "./modules/network"
@@ -22,6 +23,16 @@ data "aws_iam_role" "lab_role" {
   name = "LabRole"
 }
 
+# HW6 Part III: load balancer + target group + listener
+module "alb" {
+  source               = "./modules/alb"
+  service_name         = var.service_name
+  vpc_id               = module.network.vpc_id
+  subnet_ids           = module.network.subnet_ids
+  container_port       = var.container_port
+  deregistration_delay = var.deregistration_delay
+}
+
 module "ecs" {
   source             = "./modules/ecs"
   service_name       = var.service_name
@@ -34,8 +45,35 @@ module "ecs" {
   log_group_name     = module.logging.log_group_name
   ecs_count          = var.ecs_count
   region             = var.aws_region
+  target_group_arn   = module.alb.target_group_arn
+
+  # The service can only attach to the target group once the
+  # listener exists.
+  depends_on = [module.alb]
 }
 
+# HW6 Part III: CPU target-tracking auto scaling
+module "autoscaling" {
+  source             = "./modules/autoscaling"
+  cluster_name       = module.ecs.cluster_name
+  service_name       = module.ecs.service_name
+  min_capacity       = var.min_capacity
+  max_capacity       = var.max_capacity
+  cpu_target         = var.cpu_target
+  scale_out_cooldown = var.scale_out_cooldown
+  scale_in_cooldown  = var.scale_in_cooldown
+}
+
+# HW6 Part III: CloudWatch dashboard for the scaling tests
+module "monitoring" {
+  source                  = "./modules/monitoring"
+  service_name            = var.service_name
+  cluster_name            = module.ecs.cluster_name
+  region                  = var.aws_region
+  alb_arn_suffix          = module.alb.alb_arn_suffix
+  target_group_arn_suffix = module.alb.target_group_arn_suffix
+  cpu_target              = var.cpu_target
+}
 
 // Build & push the Go app image into ECR
 resource "docker_image" "app" {
@@ -44,7 +82,7 @@ resource "docker_image" "app" {
 
   build {
     # relative path from terraform/ → src/
-    context = "../src"
+    context  = "../src"
     platform = "linux/amd64"
     # Dockerfile defaults to "Dockerfile" in that context
   }

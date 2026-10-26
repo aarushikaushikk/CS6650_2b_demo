@@ -1,12 +1,16 @@
-# HW6 Option B: Prometheus + Grafana run locally, but scrape the app
-# running on ECS (no local app container). Set ECS_IP before starting:
-#   export ECS_IP=$(../scripts/get-ecs-ip.sh)
-#   docker compose up -d
+# HW6 Part III: Prometheus + Grafana run locally and scrape EVERY ECS task.
+# Task IPs come from scripts/update-prom-targets.sh, which writes
+# ~/cs6650-prom/targets.json (file-based service discovery).
+#
+#   Terminal 1 (repo root):  ./scripts/update-prom-targets.sh
+#   Terminal 2:              cd observability && docker compose up -d
 services:
   prometheus:
     image: prom/prometheus:v3.4.0
     ports:
       - "9090:9090"
+    volumes:
+      - ${HOME}/cs6650-prom:/etc/prometheus/sd:ro
     configs:
       - source: prom_config
         target: /etc/prometheus/prometheus.yml
@@ -28,8 +32,9 @@ configs:
       scrape_configs:
         - job_name: "product-api"
           metrics_path: /metrics
-          static_configs:
-            - targets: ["${ECS_IP:?Set ECS_IP to the ECS task public IP}:8080"]
+          file_sd_configs:
+            - files: ["/etc/prometheus/sd/targets.json"]
+              refresh_interval: 15s
 
 volumes:
   grafana-data:

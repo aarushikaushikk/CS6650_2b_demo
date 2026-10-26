@@ -60,3 +60,14 @@ variable "memory" {
   default     = "512"
   description = "Memory (MiB)"
 }
+
+variable "target_group_arn" {
+  type        = string
+  description = "ALB target group the service registers tasks with"
+}
+
+variable "health_check_grace_period" {
+  type        = number
+  default     = 30
+  description = "Seconds after task start before ALB health checks count"
+}
